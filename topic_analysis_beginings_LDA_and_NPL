@@ -1,0 +1,125 @@
+Stuff I added to MDM kaggle - 
+
+import zipfile
+import os
+
+zip_file_path = "/usr/share/nltk_data/corpora/wordnet.zip"
+extract_folder = "/usr/share/nltk_data/corpora/"
+
+with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+    zip_ref.extractall(extract_folder)
+
+!unzip /usr/share/nltk_data/corpora/wordnet.zip -d /usr/share/nltk_data/corpora/
+
+import nltk
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+import gensim
+from gensim.utils import simple_preprocess
+from gensim.parsing.preprocessing import STOPWORDS
+from nltk.stem import WordNetLemmatizer, SnowballStemmer
+from nltk.stem.porter import *
+import numpy as np
+np.random.seed(400)
+
+# Initialize stemmer
+stemmer = PorterStemmer()
+
+# Function to lemmatize and stem a given text
+def lemmatize_stemming(text):
+    return stemmer.stem(WordNetLemmatizer().lemmatize(text, pos='v'))
+
+# Function to preprocess a given text
+def preprocess(text):
+    result = []
+    custom_stopwords = set(STOPWORDS)
+    additional_stopwords = {'oh', 'one', 'youre', 'im', 'know', 'got', 'get', 'yeah', 'go', 'see', 'ill'}
+    custom_stopwords.update(additional_stopwords)
+    for token in gensim.utils.simple_preprocess(text):
+        if token not in custom_stopwords and len(token) > 3:
+            result.append(lemmatize_stemming(token))
+    return result
+
+
+# Grouping subset_df by 'tag'
+grouped_by_genre = subset_df.groupby('tag')
+
+# Dictionary to store DataFrames for each genre
+genre_df = {}
+
+# Iterate over each group in the grouped DataFrame
+for genre, df in grouped_by_genre:
+    # Copy the relevant columns ('tag' and 'cleaned_lyrics') to a new DataFrame for the genre
+    genre_df[genre] = df.loc[:, ['tag', 'cleaned_lyrics']].copy()
+
+#print(genre_df['pop'].iloc[0]['cleaned_lyrics'])
+#print(genre_df['rap'].iloc[0]['cleaned_lyrics'])
+
+# Preprocessing for 'pop' genre
+pop_words = []
+for word in genre_df['pop'].iloc[0]['cleaned_lyrics'].split():
+    pop_words.append(word)
+#print(pop_words)
+print("\nTokenized and lemmatized document for 'pop' genre:")
+print(preprocess(genre_df['pop'].iloc[0]['cleaned_lyrics']))
+
+
+# Preprocessing for 'rap' genre
+rap_words = []
+for word in genre_df['rap'].iloc[0]['cleaned_lyrics'].split():
+    rap_words.append(word)
+#print(rap_words)
+print("\nTokenized and lemmatized document for 'rap' genre:")
+print(preprocess(genre_df['rap'].iloc[0]['cleaned_lyrics']))
+
+print('pop =', genre_df['pop'].shape[0])
+print('rap =', genre_df['rap'].shape[0])
+print('rb =', genre_df['rb'].shape[0])
+print('misc =', genre_df['misc'].shape[0])
+print('country =', genre_df['country'].shape[0])
+print('rock =', genre_df['rock'].shape[0])
+
+processed_pop_songs = []
+processed_rap_songs = []
+processed_rb_songs = []
+processed_rock_songs = []
+processed_misc_songs = []
+processed_country_songs = []
+
+
+for song in genre_df['rap'].iloc[:1000]['cleaned_lyrics']:
+    processed_rap_songs.append(preprocess(song))
+for song in genre_df['rb'].iloc[:1000]['cleaned_lyrics']:
+    processed_rb_songs.append(preprocess(song))
+for song in genre_df['rock'].iloc[:1000]['cleaned_lyrics']:
+    processed_rock_songs.append(preprocess(song))
+for song in genre_df['misc'].iloc[:1000]['cleaned_lyrics']:
+    processed_misc_songs.append(preprocess(song))
+for song in genre_df['country'].iloc[:1000]['cleaned_lyrics']:
+    processed_country_songs.append(preprocess(song))
+for song in genre_df['pop'].iloc[:1000]['cleaned_lyrics']:
+    processed_pop_songs.append(preprocess(song))
+
+print(processed_pop_songs[7])
+
+pop_dictionary = gensim.corpora.Dictionary(processed_pop_songs)
+rap_dictionary = gensim.corpora.Dictionary(processed_rap_songs)
+country_dictionary = gensim.corpora.Dictionary(processed_country_songs)
+rb_dictionary = gensim.corpora.Dictionary(processed_rb_songs)
+misc_dictionary = gensim.corpora.Dictionary(processed_misc_songs)
+
+bow_corpus = [pop_dictionary.doc2bow(song) for song in processed_pop_songs]
+bow_corpus1 = [rap_dictionary.doc2bow(song) for song in processed_rap_songs]
+
+lda_model =  gensim.models.LdaMulticore(bow_corpus1, 
+                                   num_topics = 3, 
+                                   id2word = rap_dictionary,                                    
+                                   passes = 10,
+                                   workers = 2)
+
+'''For each topic, we will explore the words occuring in that topic and its relative weight
+'''
+for idx, topic in lda_model.print_topics(-1):
+    print("Topic: {} \nWords: {}".format(idx, topic ))
+    print("\n")

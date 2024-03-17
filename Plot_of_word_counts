@@ -1,0 +1,59 @@
+import matplotlib.pyplot as plt
+from collections import Counter
+import nltk
+from nltk.corpus import stopwords
+from textblob import TextBlob
+import itertools
+import matplotlib.colors as mcolors
+#customise lyrics, remove prepositions, connectives and empty meaning words
+nltk.download('stopwords')
+custom_stopwords = set(stopwords.words('english'))
+additional_stopwords = {'oh', 'one', 'youre', 'im', 'know', 'got', 'get', 'yeah', 'go', 'see', 'ill'}
+custom_stopwords.update(additional_stopwords)
+
+lyrics_corpus = ' '.join(subset_df['cleaned_lyrics'])
+words = lyrics_corpus.split()
+cleaned_words = [word for word in words if word.lower() not in custom_stopwords]
+#Find most common words
+word_counts = Counter(cleaned_words)
+sorted_word_counts = dict(sorted(word_counts.items(), key=lambda item: item[1], reverse=True))
+N = 150  
+top_words = dict(itertools.islice(sorted_word_counts.items(), N))
+
+sentiment_values = [TextBlob(word).sentiment.polarity for word in top_words]
+
+# Normalize sentiment values between -1 and 1
+min_sentiment = min(sentiment_values)
+max_sentiment = max(sentiment_values)
+norm = mcolors.Normalize(vmin=min_sentiment, vmax=max_sentiment)
+
+# Define custom color map from red to yellow to green
+colors = [(1, 0, 0), (1, 1, 0), (0, 1, 0)]  # Red -> Yellow -> Green
+custom_cmap = mcolors.LinearSegmentedColormap.from_list("CustomRedYellowGreen", colors)
+
+color_map = plt.cm.ScalarMappable(norm=norm, cmap=custom_cmap)
+sentiment_colours = [color_map.to_rgba(sentiment) for sentiment in sentiment_values]
+
+plt.figure(figsize=(10, 6))
+plt.bar(list(top_words.keys())[:20], list(top_words.values())[:20], color=sentiment_colours[:20])
+plt.xlabel('Word')
+plt.ylabel('Frequency')
+plt.title('Top 10 Most Frequent Words in Lyrics')
+plt.xticks(rotation=45)
+plt.show()
+
+sentiment_filtered_words = [word for word in top_words if abs(TextBlob(word).sentiment.polarity) > 0.1]
+sentiment_filtered_values = [TextBlob(word).sentiment.polarity for word in sentiment_filtered_words]
+
+norm = mcolors.Normalize(vmin=min_sentiment, vmax=max_sentiment)
+color_map = plt.cm.ScalarMappable(norm=norm, cmap=custom_cmap)
+
+sentiment_colours = [color_map.to_rgba(sentiment) for sentiment in sentiment_filtered_values]
+
+plt.figure(figsize=(10, 6))
+plt.bar(sentiment_filtered_words[:20], [top_words[word] for word in sentiment_filtered_words[:20]], color=sentiment_colours[:20])
+plt.xlabel('Word')
+plt.ylabel('Frequency')
+plt.title('Top 10 Most Frequent Words with Sentiment Polarity Magnitude > 0.1 in Lyrics')
+plt.xticks(rotation=45)
+plt.show()
